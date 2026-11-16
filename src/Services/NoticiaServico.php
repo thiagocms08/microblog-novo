@@ -52,6 +52,67 @@ final class NoticiaServico
         }
     }
 
+    public function buscarPorId(TipoUsuario $tipoUsuario, int $usuarioId, int $noticiaId): ?array
+    {
+        $sql = "SELECT noticias.id, noticias.data, noticias.titulo, noticias.texto,
+                       noticias.resumo, noticias.imagem, noticias.destaque,
+                       noticias.usuario_id, noticias.categoria_id, usuarios.nome AS autor
+                FROM noticias
+                LEFT JOIN usuarios ON noticias.usuario_id = usuarios.id
+                WHERE noticias.id = :noticia_id";
+
+        if ($tipoUsuario !== TipoUsuario::ADMIN) {
+            $sql .= " AND noticias.usuario_id = :usuario_id";
+        }
+
+        try {
+            $consulta = $this->conexao->prepare($sql);
+            $consulta->bindValue(":noticia_id", $noticiaId);
+
+            if ($tipoUsuario !== TipoUsuario::ADMIN) {
+                $consulta->bindValue(":usuario_id", $usuarioId);
+            }
+
+            $consulta->execute();
+            return $consulta->fetch() ?: null;
+        } catch (PDOException $e) {
+            Utils::registrarLog($e);
+            throw new Exception("Erro ao buscar notícia por ID");
+        }
+    }
+
+    public function atualizar(Noticia $noticia, TipoUsuario $tipoUsuario, int $usuarioId): void
+    {
+        $sql = "UPDATE noticias
+                SET titulo = :titulo, texto = :texto, resumo = :resumo,
+                    imagem = :imagem, destaque = :destaque, categoria_id = :categoria_id
+                WHERE id = :id";
+
+        if ($tipoUsuario !== TipoUsuario::ADMIN) {
+            $sql .= " AND usuario_id = :usuario_id";
+        }
+
+        try {
+            $consulta = $this->conexao->prepare($sql);
+            $consulta->bindValue(":titulo", $noticia->getTitulo());
+            $consulta->bindValue(":texto", $noticia->getTexto());
+            $consulta->bindValue(":resumo", $noticia->getResumo());
+            $consulta->bindValue(":imagem", $noticia->getImagem());
+            $consulta->bindValue(":destaque", $noticia->getDestaque()->value);
+            $consulta->bindValue(":categoria_id", $noticia->getCategoriaId());
+            $consulta->bindValue(":id", $noticia->getId());
+
+            if ($tipoUsuario !== TipoUsuario::ADMIN) {
+                $consulta->bindValue(":usuario_id", $usuarioId);
+            }
+
+            $consulta->execute();
+        } catch (PDOException $e) {
+            Utils::registrarLog($e);
+            throw new Exception("Erro ao atualizar notícia");
+        }
+    }
+
     public function inserir(Noticia $noticia): void
     {
         $sql = "INSERT INTO noticias (
